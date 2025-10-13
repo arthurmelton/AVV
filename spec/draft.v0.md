@@ -6,7 +6,7 @@ Everything is in big-endian / network order
 
 |Offset|Length|Description|
 |-|-|-|
-|0x00|3 bytes|fixed `0x668677` magic value|
+|0x00|3 bytes|fixed `0x415656` magic value|
 |0x03|1 byte|version number (corresponds to the version in this file name)|
 |0x04|8 bytes|64-bit float for aspect ratio.<br /><br />- The sign bit references whether the video loops.<br />- The first bit in the exponent references whether we are calculating the `x` or `y`. If the bit is `0`, we are calculating `x` in terms of `y` (ex. `x=float*y`); if `1`, we are calculating `y` in terms of `x`. The number that is not being calculated is always equal to `1`.<br /><br />Before using the float, set the first two bits to `0` (`and` by `0x3FFFFFFFFFFFFFFF`).|
 |0x0C|4 bytes|A 32-bit float indicating the theoretical max [color](#color) value we are using (e.g., `1` for SDR, `10` for HDR)|
