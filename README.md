@@ -1,2 +1,2 @@
-# BVM
-Bézier Vector Movie
+# AVM
+Anneliese Vector Movie
