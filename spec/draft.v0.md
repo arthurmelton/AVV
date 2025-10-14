@@ -9,9 +9,10 @@ Everything is in big-endian / network order
 |0x00|3 bytes|fixed `0x415656` magic value|
 |0x03|1 byte|version number (corresponds to the version in this file name)|
 |0x04|8 bytes|64-bit float for aspect ratio.<br /><br />- The sign bit references whether the video loops.<br />- The first bit in the exponent references whether we are calculating the `x` or `y`. If the bit is `0`, we are calculating `x` in terms of `y` (ex. `x=float*y`); if `1`, we are calculating `y` in terms of `x`. The number that is not being calculated is always equal to `1`.<br /><br />Before using the float, set the first two bits to `0` (`and` by `0x3FFFFFFFFFFFFFFF`).|
-|0x0C|4 bytes|A 32-bit float indicating the theoretical max [color](#color) value we are using (e.g., `1` for SDR, `10` for HDR)|
-|0x10|8 bytes|The number of [frame packets or number of header packets](#frame-packet)|
-|0x18|`16*header_packets-8` bytes (varies)|Implicit zero for the first 8 bytes for the first packet.<br /><br />- The first 8 bytes are an unsigned 64-bit number referencing the number of nanoseconds since the start of the video. (These need to be in ascending order (duplicates allowed); otherwise it is UB.)<br />- The second unsigned 64-bit number references the offset after the header for the first byte in the [frame packet](#frame-packet).|
+|0x0C|4 bytes|A 32-bit float indicating the theoretical max [color](#color) value we are using (e.g., `1` for SDR, `10` for HDR). The sign bit is for if packets are compressed with Z standard (zstd).|
+|0x10|8 bytes|The number of [frame packets or number of header packets](#frame-packet) minus one, you always have to have atleast one frame packet|
+|0x18|`16*header_packets_count` bytes (varies)|Implicit zero for the first 8 bytes for the first packet. And implicit zero for the 8 bytes after that. (If there is only one packet, so the number before this was zero, this field is not needed)<br /><br />- The first 8 bytes are an unsigned 64-bit number referencing the number of nanoseconds since the start of the video. (These need to be in ascending order (duplicates allowed); otherwise it is UB.)<br />- The second unsigned 64-bit number references the offset after the header for the first byte in the [frame packet](#frame-packet).|
+|`0x18+0x10*header_packet_count`|varies|This is where the array of frame packets go|
 
 ## Frame Packet
 
@@ -72,7 +73,7 @@ The arguments are an array of [ids](#id-4-bytes) that are deleted. Referencing t
 
 |Offset|Length|Description|
 |-|-|-|
-|0x00|2 bytes|First bit is a flag for whether it affects `x`; second is for `y`. 2 bits reserved. The next 12 bits are the number of [Bézier positions](#bézier-position-12-bytes).|
+|0x00|2 bytes|First bit is a flag for whether it affects `x`; second is for `y`. 2 bits reserved. The next 12 bits are the number of [Bézier positions](#bézier-position-12-bytes) minus one.|
 |0x02|`(bézier_positions-1)*12+8` bytes (varies)|The first position has an implicit `0` for the `x`. Then it's an array of [Bézier position](#bézier-position-12-bytes).|
 |`0x0A+(bézier_positions-1)*0x0C`|`operation_bytes-current_offset` bytes (varies)|This is a list of [ids](#id-4-bytes) that this operation affects.|
 
@@ -82,7 +83,7 @@ If both `x` and `y` is set, then both get effected by this.
 
 |Offset|Length|Description|
 |-|-|-|
-|0x00|2 bytes|First bit flags whether the color affects red; next flags green, blue, then alpha. The next 12 bits are the number of [Bézier filter](#bézier-filter-12-bytes). 0 is UB.|
+|0x00|2 bytes|First bit flags whether the color affects red; next flags green, blue, then alpha. The next 12 bits are the number of [Bézier filter](#bézier-filter-12-bytes) minus one.|
 |0x02|4-16 bytes (varies)|The [color](#color-16-bytes) that will be affected. If the bit for a channel is not set in the flag, those bytes are skipped. If the flag is `0110`, we would only have 8 bytes here: the first 4 for green, then 4 for blue.|
 |0x02+(0x04 to 0x0F) (varies)|`(bézier_filters-1)*12+8` bytes (varies)|The first filter has an implicit `0` for the `x`. Then it's an array of [Bézier filter](#bézier-filter-12-bytes).|
 |`0x0A+(bézier_filters-1)*0x0C+(0x04 to 0x0F)` (varies)|`operation_bytes-current_offset` bytes (varies)|This is a list of [ids](#id-4-bytes) that this operation affects.|
@@ -91,7 +92,7 @@ If both `x` and `y` is set, then both get effected by this.
 
 |Offset|Length|Description|
 |-|-|-|
-|0x00|2 bytes|First bit flags whether the color affects red; next flags green, blue, then alpha. The next 12 bits are the number of [Bézier filter](#bézier-filter-12-bytes). 0 is UB.|
+|0x00|2 bytes|First bit flags whether the color affects red; next flags green, blue, then alpha. The next 12 bits are the number of [Bézier filter](#bézier-filter-12-bytes) minus one.|
 |0x02|4-16 bytes (varies)|The [color](#color-16-bytes) that will be affected. If the bit for a channel is not set in the flag, those bytes are skipped. If the flag is `0110`, we would only have 8 bytes here: the first 4 for green, then 4 for blue.|
 |0x02+(0x04 to 0x0F) (varies)|`(bézier_filters-1)*12+8` bytes (varies)|The first filter has an implicit `0` for the `x`. Then it's an array of [Bézier filter](#bézier-filter-12-bytes).|
 |`0x0A+(bézier_filters-1)*0x0C+(0x04 to 0x0F)` (varies)|`operation_bytes-current_offset` bytes (varies)|This is a list of [ids](#id-4-bytes) that this operation affects.|
@@ -102,7 +103,7 @@ The fill location uses the `even-odd` rule to know when we are inside and when w
 
 |Offset|Length|Description|
 |-|-|-|
-|0x00|2 bytes|4 unreserved bits. The next 12 bits are the number of [Bézier filter](#bézier-filter-12-bytes). 0 is UB.|
+|0x00|2 bytes|4 unreserved bits. The next 12 bits are the number of [Bézier filter](#bézier-filter-12-bytes) minus one.|
 |0x02|8 bytes|The width of the stroke as a 64-bit float. `1` is half the screen, and `2` is the whole screen (it's the same length as the [x and y in positions](#world-position)). The width is how far out from the line it goes. Negative is UB.|
 |0x0A|`(bézier_filters-1)*12+8` bytes (varies)|The first filter has an implicit `0` for the `x`. Then it's an array of [Bézier filter](#bézier-filter-12-bytes).|
 |`0x12+(bézier_filters-1)*0x0C` (varies)|`operation_bytes-current_offset` bytes (varies)|This is a list of [ids](#id-4-bytes) that this operation affects.|
@@ -111,7 +112,7 @@ The fill location uses the `even-odd` rule to know when we are inside and when w
 
 |Offset|Length|Description|
 |-|-|-|
-|0x00|2 bytes|First bit flags whether the color affects red; next flags green, blue, then alpha. The next 12 bits are the number of [Bézier fines](#bézier-fine-16-bytes). 0 is UB.|
+|0x00|2 bytes|First bit flags whether the color affects red; next flags green, blue, then alpha. The next 12 bits are the number of [Bézier fines](#bézier-fine-16-bytes) minus one.|
 |0x02|4-16 bytes (varies)|The [color](#color-16-bytes) that will be affected. If the bit for a channel is not set in the flag, those bytes are skipped. If the flag is `0110`, we would only have 8 bytes here: the first 4 for green, then 4 for blue.|
 |0x02+(0x04 to 0x10) (varies)|`bézier_fines*16` bytes (varies)|An array of [Bézier fine](#bézier-fine-16-bytes). The `x` indicates how far away from the stroke we are: `0` is at the stroke, and `1` is at the stroke width away.|
 |`0x02+bézier_fines*0x10+(0x04 to 0x0F)` (varies)|`operation_bytes-current_offset` bytes (varies)|This is a list of [ids](#id-4-bytes) that this operation affects.|
@@ -122,7 +123,7 @@ The default stroke width is `0`.
 
 |Offset|Length|Description|
 |-|-|-|
-|0x00|2 bytes|First bit flags whether the color affects red; next flags green, blue, then alpha. The next 12 bits are the number of [Bézier fines](#bézier-fine-16-bytes). 0 is UB.|
+|0x00|2 bytes|First bit flags whether the color affects red; next flags green, blue, then alpha. The next 12 bits are the number of [Bézier fines](#bézier-fine-16-bytes) minus one.|
 |0x02|16 bytes|This is a [world position](#world-position-16-bytes) that is where the gradient is from. The gradient direction and source are attributes of the items, so any modifications to the curves also affect this (e.g., move, rotate, scale). For directional gradients, have at least the `x` or `y` equal to infinity (`NaN` is UB). The angle between the non-infinity value and `(0,0)` gives a value between `0` and `pi/2`; the infinity value determines which 45° rotated quadrant we are in. For example, if x is negative infinity and y is 1, the radian value is `3pi/4`. If y is negative infinity and x is `-0.5`, that gives `7pi/4`. Take the non-infinity value and multiply it by `pi/4`; for `x==infinity` add 0, `y==infinity` add `pi/2`, `x==-infinity` add `pi`, and `y==-infinity` add `3pi/2`.|
 |0x12|4-16 bytes (varies)|The [color](#color-16-bytes) that will be affected. If the bit for a channel is not set in the flag, those bytes are skipped. If the flag is `0110`, we would only have 8 bytes here: the first 4 for green, then 4 for blue.|
 |0x12+(0x04 to 0x18) (varies)|`bézier_fines*16` bytes (varies)|An array of [Bézier fine](#bézier-fine-16-bytes). The `x` indicates how far away from the source we are: `0` is at the stroke, and `1` is at the stroke width away. For directional points it is based on distance from the closest point of the tangent point on the circle with radius sqrt(2) around the viewing plane, from the farthest point from the radian location. (For example, with an angle of `pi/4` (~0.7854), the distance is how far the point is from `y=-x-2`, or `y=tan(r+pi/2)(x+cos(r)*sqrt(2))-sin(r)*sqrt(2)`.)|
@@ -132,7 +133,7 @@ The default stroke width is `0`.
 
 |Offset|Length|Description|
 |-|-|-|
-|0x00|2 bytes|4 unused bits. The next 12 bits are the number of [Bézier filters](#bézier-filter-12-bytes). 0 is UB.|
+|0x00|2 bytes|4 unused bits. The next 12 bits are the number of [Bézier filters](#bézier-filter-12-bytes) minus one.|
 |0x02|16 bytes|This is a [world position](#world-position-16-bytes) that is the rotation origin. The rotation location is not an attribute of the items.|
 |0x12|`(bézier_filters-1)*12+8` bytes (varies)|The first filter has an implicit `0` for the `x`. Then it's an array of [Bézier filter](#bézier-filter-12-bytes). The y value is how many radians to rotate by. If it is `pi/2`, that means rotate by `-90 degrees clockwise`; `3pi/2` or `-pi/2` means rotate by `90 degrees clockwise`.|
 |`0x1A+(bézier_filters-1)*0xC` (varies)|`operation_bytes-current_offset` bytes (varies)|This is a list of [ids](#id-4-bytes) that this operation affects.|
@@ -143,7 +144,7 @@ Addative rotation works by taking the delta of the point locations before and af
 
 |Offset|Length|Description|
 |-|-|-|
-|0x00|2 bytes|4 unused bits. The next 12 bits are the number of [Bézier filters](#bézier-filter-12-bytes). 0 is UB.|
+|0x00|2 bytes|4 unused bits. The next 12 bits are the number of [Bézier filters](#bézier-filter-12-bytes) minus one.|
 |0x02|16 bytes|This is a [world position](#world-position-16-bytes) that is the scale origin. The scale location is not an attribute of the items.|
 |0x12|`(bézier_filters-1)*12+8` bytes (varies)|The first filter has an implicit `0` for the `x`. Then it's an array of [Bézier filter](#bézier-filter-12-bytes). The y value is the scale set on the object: `1` means no change, `2` means twice as big, and `1/2` means half the size.|
 |`0x1A+(bézier_filters-1)*0xC` (varies)|`operation_bytes-current_offset` bytes (varies)|This is a list of [ids](#id-4-bytes) that this operation affects.|
