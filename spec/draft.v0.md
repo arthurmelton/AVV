@@ -12,7 +12,8 @@ Everything is in big-endian / network order
 |0x0C|4 bytes|A 32-bit float indicating the theoretical max [color](#color) value we are using (e.g., `1` for SDR, `10` for HDR).|
 |0x10|8 bytes|The number of [frame packets or number of header packets](#frame-packet) minus one, you always have to have atleast one frame packet|
 |0x18|`16*header_packets_count` bytes (varies)|Implicit zero for the first 8 bytes for the first packet. And implicit zero for the 8 bytes after that. (If there is only one packet, so the number before this was zero, this field is not needed)<br /><br />- The first 8 bytes are an unsigned 64-bit number referencing the number of nanoseconds since the start of the video. (These need to be in ascending order (duplicates allowed); otherwise it is UB.)<br />- The second unsigned 64-bit number references the offset after the header for the first byte in the [frame packet](#frame-packet).|
-|`0x18+0x10*header_packet_count`|varies|This is where the array of frame packets go|
+|`0x18+0x10*header_packet_count`|8 bytes|An unsigned 64 bit number saying how long the video is in nanoseconds, stops playing once this point is reached.|
+|`0x20+0x10*header_packet_count`|varies|This is where the array of frame packets go|
 
 ## Frame Packet
 

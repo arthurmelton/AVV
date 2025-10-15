@@ -11,6 +11,8 @@ printf '3F800000' | xxd -r -p >> ball.v0.avv
 # 1 frame packet
 printf '0000000000000000' | xxd -r -p >> ball.v0.avv
 # skipping the packet offsets because we only have one packet
+# a 2^32 ns video
+printf '0000000100000000' | xxd -r -p >> ball.v0.avv
 
 
 # create line
