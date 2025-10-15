@@ -9,7 +9,7 @@ Everything is in big-endian / network order
 |0x00|3 bytes|fixed `0x415656` magic value|
 |0x03|1 byte|version number (corresponds to the version in this file name)|
 |0x04|8 bytes|64-bit float for aspect ratio.<br /><br />- The sign bit references whether the video loops.<br />- The first bit in the exponent references whether we are calculating the `x` or `y`. If the bit is `0`, we are calculating `x` in terms of `y` (ex. `x=float*y`); if `1`, we are calculating `y` in terms of `x`. The number that is not being calculated is always equal to `1`.<br /><br />Before using the float, set the first two bits to `0` (`and` by `0x3FFFFFFFFFFFFFFF`).|
-|0x0C|4 bytes|A 32-bit float indicating the theoretical max [color](#color) value we are using (e.g., `1` for SDR, `10` for HDR). The sign bit is for if packets are compressed with Z standard (zstd).|
+|0x0C|4 bytes|A 32-bit float indicating the theoretical max [color](#color) value we are using (e.g., `1` for SDR, `10` for HDR).|
 |0x10|8 bytes|The number of [frame packets or number of header packets](#frame-packet) minus one, you always have to have atleast one frame packet|
 |0x18|`16*header_packets_count` bytes (varies)|Implicit zero for the first 8 bytes for the first packet. And implicit zero for the 8 bytes after that. (If there is only one packet, so the number before this was zero, this field is not needed)<br /><br />- The first 8 bytes are an unsigned 64-bit number referencing the number of nanoseconds since the start of the video. (These need to be in ascending order (duplicates allowed); otherwise it is UB.)<br />- The second unsigned 64-bit number references the offset after the header for the first byte in the [frame packet](#frame-packet).|
 |`0x18+0x10*header_packet_count`|varies|This is where the array of frame packets go|
@@ -18,6 +18,8 @@ Everything is in big-endian / network order
 
 The world is reset at the start of a frame packet (each packet is roughly an I frame + many P frames). By default the world has no object and the background is fully transparent.
 Each frame packet is an array of [operations](#operation) with no other metadata.
+
+All Frame Packets are compressed with LZMA, use the newest [lzma sdk](https://www.7-zip.org/sdk.html) version for compression for the highest ratios.
 
 ## Operation
 
@@ -63,7 +65,9 @@ Lines with 1 position are a point, 2 are a line, 3 are a curve, etc.
 
 All new objects are created over all previous objects, so there is no way to edit z-index. Your curve [id](#id-4-bytes) is the z-index.
 
-The array is delimited with `0x7FF0`, so if the first 2 bytes of the [world position](#world-position-16-bytes) are that, shift over the window by 2 and continue reading. Having an array with nothing in it is UB; that includes ending with a delimiter.
+The array is delimited with `0x7FF0` or `0xFFF0`, so if the first 2 bytes of the [world position](#world-position-16-bytes) are that, shift over the window by 2 and continue reading. Having an array with nothing in it is UB. Using `0xFFF0` means that the edge should be rounded together so that you get a seamless line, `0x7FF0` means that it should just be 2 independent lines.
+
+You can start or end a full curve with `0xFFF0` to mean that the end of the line be rounded off. If you start with one then the start of the line is rounded off, and if you end with one the end will be rounded off. If you round off, stroke color and gradiant will also be ended to go over the edge also.
 
 ### Delete
 

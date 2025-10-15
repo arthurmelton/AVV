@@ -14,89 +14,91 @@ printf '0000000000000000' | xxd -r -p >> ball.v0.avv
 
 
 # create line
-printf '00' | xxd -r -p >> ball.v0.avv
+packet="00"
 # start instantly
-printf '00000000' | xxd -r -p >> ball.v0.avv
+packet+="00000000"
 # number of bytes minus one (4 curves each with 4 points)
-printf '00D5' | xxd -r -p >> ball.v0.avv
+packet+="00D5"
 
 # drawing lines from https://spencermortensen.com/articles/bezier-circle/ for circle
-printf '0000000000000000' | xxd -r -p >> ball.v0.avv
-printf '3FC00039C0E8D654' | xxd -r -p >> ball.v0.avv
-printf '3FB1B5B146205835' | xxd -r -p >> ball.v0.avv
-printf '3FBFF59F7D356C3D' | xxd -r -p >> ball.v0.avv
-printf '3FBFF59F7D356C3D' | xxd -r -p >> ball.v0.avv
-printf '3FB1B5B146205835' | xxd -r -p >> ball.v0.avv
-printf '3FC00039C0E8D654' | xxd -r -p >> ball.v0.avv
-printf '0000000000000000' | xxd -r -p >> ball.v0.avv
-printf '7FF0' | xxd -r -p >> ball.v0.avv
-printf '3FBFF59F7D356C3D' | xxd -r -p >> ball.v0.avv
-printf 'BFB1B5B146205835' | xxd -r -p >> ball.v0.avv
-printf '3FB1B5B146205835' | xxd -r -p >> ball.v0.avv
-printf 'BFBFF59F7D356C3D' | xxd -r -p >> ball.v0.avv
-printf '0000000000000000' | xxd -r -p >> ball.v0.avv
-printf 'BFC00039C0E8D654' | xxd -r -p >> ball.v0.avv
-printf '7FF0' | xxd -r -p >> ball.v0.avv
-printf 'BFB1B5B146205835' | xxd -r -p >> ball.v0.avv
-printf 'BFBFF59F7D356C3D' | xxd -r -p >> ball.v0.avv
-printf 'BFBFF59F7D356C3D' | xxd -r -p >> ball.v0.avv
-printf 'BFB1B5B146205835' | xxd -r -p >> ball.v0.avv
-printf 'BFC00039C0E8D654' | xxd -r -p >> ball.v0.avv
-printf '0000000000000000' | xxd -r -p >> ball.v0.avv
-printf '7FF0' | xxd -r -p >> ball.v0.avv
-printf 'BFBFF59F7D356C3D' | xxd -r -p >> ball.v0.avv
-printf '3FB1B5B146205835' | xxd -r -p >> ball.v0.avv
-printf 'BFB1B5B146205835' | xxd -r -p >> ball.v0.avv
-printf '3FBFF59F7D356C3D' | xxd -r -p >> ball.v0.avv
-printf '0000000000000000' | xxd -r -p >> ball.v0.avv
-printf '3FC00039C0E8D654' | xxd -r -p >> ball.v0.avv
+packet+="0000000000000000"
+packet+="3FC00039C0E8D654"
+packet+="3FB1B5B146205835"
+packet+="3FBFF59F7D356C3D"
+packet+="3FBFF59F7D356C3D"
+packet+="3FB1B5B146205835"
+packet+="3FC00039C0E8D654"
+packet+="0000000000000000"
+packet+="7FF0"
+packet+="3FBFF59F7D356C3D"
+packet+="BFB1B5B146205835"
+packet+="3FB1B5B146205835"
+packet+="BFBFF59F7D356C3D"
+packet+="0000000000000000"
+packet+="BFC00039C0E8D654"
+packet+="7FF0"
+packet+="BFB1B5B146205835"
+packet+="BFBFF59F7D356C3D"
+packet+="BFBFF59F7D356C3D"
+packet+="BFB1B5B146205835"
+packet+="BFC00039C0E8D654"
+packet+="0000000000000000"
+packet+="7FF0"
+packet+="BFBFF59F7D356C3D"
+packet+="3FB1B5B146205835"
+packet+="BFB1B5B146205835"
+packet+="3FBFF59F7D356C3D"
+packet+="0000000000000000"
+packet+="3FC00039C0E8D654"
 
 # set the ball to blue
-printf '04' | xxd -r -p >> ball.v0.avv
+packet+="04"
 # start instantly
-printf '00000000' | xxd -r -p >> ball.v0.avv
+packet+="00000000"
 # number of bytes
-printf '000A' | xxd -r -p >> ball.v0.avv
+packet+="000A"
 # blue and alpha and 1 point set to 1
-printf '5000' | xxd -r -p >> ball.v0.avv
-printf '3FF0000000000000' | xxd -r -p >> ball.v0.avv
+packet+="5000"
+packet+="3FF0000000000000"
 
 # have ball fall
-printf '02' | xxd -r -p >> ball.v0.avv
+packet+="02"
 # start instantly
-printf '00000000' | xxd -r -p >> ball.v0.avv
+packet+="00000000"
 # number of bytes
-printf '0024' | xxd -r -p >> ball.v0.avv
+packet+="0024"
 
 # effects only x and 3 points
-printf '8002' | xxd -r -p >> ball.v0.avv
+packet+="8002"
 # (0,0)
-printf '0000000000000000' | xxd -r -p >> ball.v0.avv
+packet+="0000000000000000"
 # (2^31, 0)
-printf '80000000' | xxd -r -p >> ball.v0.avv
-printf '0000000000000000' | xxd -r -p >> ball.v0.avv
+packet+="80000000"
+packet+="0000000000000000"
 # (2^31, -1)
-printf '80000000' | xxd -r -p >> ball.v0.avv
-printf 'BFF0000000000000' | xxd -r -p >> ball.v0.avv
+packet+="80000000"
+packet+="BFF0000000000000"
 # only effect our first line
-printf '00000001' | xxd -r -p >> ball.v0.avv
+packet+="00000001"
 
 # have ball bounce back
-printf '02' | xxd -r -p >> ball.v0.avv
-# start instantly
-printf '00000000' | xxd -r -p >> ball.v0.avv
+packet+="02"
+# start after ball is at the lowest
+packet+="80000000"
 # number of bytes
-printf '0024' | xxd -r -p >> ball.v0.avv
+packet+="0024"
 
 # effects only x and 3 points
-printf '8003' | xxd -r -p >> ball.v0.avv
+packet+="8003"
 # (0,0)
-printf '0000000000000000' | xxd -r -p >> ball.v0.avv
+packet+="0000000000000000"
 # (2^31, 0)
-printf '80000000' | xxd -r -p >> ball.v0.avv
-printf '0000000000000000' | xxd -r -p >> ball.v0.avv
+packet+="80000000"
+packet+="0000000000000000"
 # (2^31, 1)
-printf '80000000' | xxd -r -p >> ball.v0.avv
-printf '3FF0000000000000' | xxd -r -p >> ball.v0.avv
+packet+="80000000"
+packet+="3FF0000000000000"
 # only effect our first line
-printf '00000001' | xxd -r -p >> ball.v0.avv
+packet+="00000001"
+
+printf "%s" "$packet" | xxd -r -p | lzma -9 >> ball.v0.avv
