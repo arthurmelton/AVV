@@ -1,5 +1,6 @@
 const std = @import("std");
 const main = @import("main.zig");
+const bezier = @import("bezier.zig");
 
 const AVVFileOpenError = error{
     NotAVVFile,
@@ -9,6 +10,30 @@ pub const AVV_Packets = struct {
     nanosecondOffest: u64,
     byteOffest: u64,
 };
+
+pub const AVV_Snapshot = struct {
+    nanosecondOffest: u32,
+    function: AVV_Function,
+};
+
+pub const AVV_Function = union {
+    create: AVV_Create,
+    delete: AVV_Delete,
+    move: AVV_Move,
+};
+
+pub const AVV_Create = struct { points: []AVV_WorldPostion };
+
+pub const AVV_Delete = struct { ids: []u32 };
+
+pub const AVV_Move = struct {
+    effects_x: bool,
+    effects_y: bool,
+    positions: []bezier.Points,
+    ids: []u32,
+};
+
+pub const AVV_WorldPostion = struct { x: f64, y: f64 };
 
 pub const AVV_File = struct {
     file: std.fs.File,
@@ -58,6 +83,11 @@ pub const AVV_File = struct {
             .videoLength = videoLength,
             .packetsOffset = packetsOffset,
         };
+    }
+
+    pub fn get(time: u64, prev: ?AVV_Snapshot) !AVV_Snapshot {
+        _ = time;
+        _ = prev;
     }
 
     pub fn close(self: AVV_File) void {
