@@ -1,6 +1,7 @@
 const std = @import("std");
 const main = @import("main.zig");
 const bezier = @import("bezier.zig");
+const functions = @import("functions/mod.zig");
 
 const AVVFileOpenError = error{
     NotAVVFile,
@@ -27,42 +28,11 @@ pub const AVV_Packet = struct {
 
 pub const AVV_Snapshot = struct {
     nanosecondOffest: u32,
-    function: AVV_Function,
+    function: functions.AVV_Function,
 
     pub fn close(self: AVV_Snapshot) void {
         self.function.close();
     }
-};
-
-const functions = enum { create, delete, move };
-
-pub const AVV_Function = union(functions) {
-    create: AVV_Create,
-    delete: AVV_Delete,
-    move: AVV_Move,
-
-    pub fn close(self: AVV_Function) void {
-        switch (self) {
-            .create => |c| {
-                for (c.points.items) |p| {
-                    p.points.deinit();
-                }
-                c.points.deinit();
-            },
-            else => {},
-        }
-    }
-};
-
-pub const AVV_Create = struct { points: std.ArrayListAligned(AVV_Line, null) };
-
-pub const AVV_Delete = struct { ids: []u32 };
-
-pub const AVV_Move = struct {
-    effects_x: bool,
-    effects_y: bool,
-    positions: []bezier.Point,
-    ids: []u32,
 };
 
 pub const AVV_Line = struct { startRounded: bool, endRounded: bool, points: std.ArrayListAligned(AVV_WorldPostion, null) };
@@ -151,72 +121,29 @@ pub const AVV_File = struct {
 
             var packets = std.ArrayList(AVV_Snapshot).init(main.allocator);
 
-            var have_read: u64 = 0;
-            while (have_read < d.state.unpacked_size.?) {
-                const function = try read(u8, decompressed);
-                const timeOffset = try read(u32, decompressed);
-                const args = try read(u16, decompressed);
+            var header: [7]u8 = undefined;
+            while (decompressed.read(&header) catch 0 == 7) {
+                const function = header[0];
+                const timeOffset = byteSwap(u32, header[1..5]);
+                const args = byteSwap(u16, header[5..7]);
 
-                var buf = try main.allocator.alloc(u8, args);
+                const buf = try main.allocator.alloc(u8, args);
                 defer main.allocator.free(buf);
                 _ = try decompressed.read(buf);
 
-                have_read += 7 + args;
-
-                var i: u16 = 0;
-
-                const funcUnion: AVV_Function = bk: switch (function) {
-                    0 => {
-                        var points = try std.ArrayList(AVV_Line).initCapacity(main.allocator, 0);
-                        var positions = try std.ArrayList(AVV_WorldPostion).initCapacity(main.allocator, 0);
-
-                        var connected_end: bool = undefined;
-                        var startRounded: bool = byteSwap(u16, buf[0..2]) == 0xFFF0;
-                        if (startRounded) i += 2;
-
-                        while (i < args) {
-                            const firstTwo = byteSwap(u16, @ptrCast(buf[i .. i + 2].ptr));
-                            if (firstTwo == 0xFFF0 or firstTwo == 0x7FF0) {
-                                connected_end = firstTwo == 0xFFF0;
-
-                                var new = try points.addOne();
-                                new = @constCast(&AVV_Line{ .startRounded = startRounded, .endRounded = connected_end, .points = positions });
-
-                                positions = std.ArrayList(AVV_WorldPostion).init(main.allocator);
-
-                                startRounded = connected_end;
-                                i += 2;
-                            } else {
-                                const first = byteSwap(f64, @ptrCast(buf[i .. i + 8].ptr));
-                                i += 8;
-                                const second = byteSwap(f64, @ptrCast(buf[i .. i + 8].ptr));
-                                i += 8;
-
-                                var new = try positions.addOne();
-                                new = @constCast(&AVV_WorldPostion{
-                                    .x = first,
-                                    .y = second,
-                                });
-                            }
-                        }
-
-                        if (positions.items.len > 0) {
-                            var new = try points.addOne();
-                            new = @constCast(&AVV_Line{ .startRounded = startRounded, .endRounded = false, .points = positions });
-                        } else {
-                            positions.deinit();
-                        }
-
-                        break :bk AVV_Function{ .create = .{ .points = points } };
-                    },
+                const funcUnion: functions.AVV_Function = switch (function) {
+                    0 => try functions.create.parse(buf),
                     else => unreachable,
                 };
 
-                var new = packets.addOne();
-                new = @constCast(&AVV_Snapshot{
+                (try packets.addOne()).* = AVV_Snapshot{
                     .nanosecondOffest = timeOffset,
                     .function = funcUnion,
-                });
+                };
+
+                for (packets.items) |i| {
+                    std.debug.print("{any}\n", .{i});
+                }
             }
 
             current = AVV_Packet{
@@ -236,14 +163,14 @@ pub const AVV_File = struct {
     }
 };
 
-fn read(comptime T: type, file: anytype) !T {
+pub fn read(comptime T: type, file: anytype) !T {
     var buf: [@sizeOf(T)]u8 = undefined;
     _ = try file.read(&buf);
 
     return @bitCast(byteSwap(T, &buf));
 }
 
-fn byteSwap(comptime T: type, buf: *[@sizeOf(T)]u8) T {
+pub fn byteSwap(comptime T: type, buf: *[@sizeOf(T)]u8) T {
     if (@import("builtin").cpu.arch.endian() == .big) {
         return @bitCast(buf.*);
     } else {

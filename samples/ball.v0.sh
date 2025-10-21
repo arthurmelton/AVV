@@ -20,7 +20,7 @@ packet="00"
 # start instantly
 packet+="00000000"
 # number of bytes minus one (4 curves each with 4 points)
-packet+="00D5"
+packet+="00D6"
 
 # drawing lines from https://spencermortensen.com/articles/bezier-circle/ for circle
 packet+="0000000000000000"
