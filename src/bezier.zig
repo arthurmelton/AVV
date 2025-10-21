@@ -7,6 +7,8 @@ const max_tries = std.math.maxInt(i_type);
 
 pub fn get(a: u32, points: []Point) f64 {
     const upper: u32 = points[points.len - 1].x;
+    if (a >= upper) return points[points.len - 1].y;
+
     const upper_minus_a = upper - a;
     const num_of_points = @as(u32, @truncate(points.len));
 

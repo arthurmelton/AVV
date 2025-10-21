@@ -11,27 +11,61 @@ pub const AVV_Packets = struct {
     byteOffest: u64,
 };
 
+pub const AVV_Packet = struct {
+    index: u64,
+    startNanosecondOffest: u64,
+    endNanosecondOffest: u64,
+    snapshots: std.ArrayListAligned(AVV_Snapshot, null),
+
+    pub fn close(self: AVV_Packet) void {
+        for (self.snapshots.items) |i| {
+            i.close();
+        }
+        self.snapshots.deinit();
+    }
+};
+
 pub const AVV_Snapshot = struct {
     nanosecondOffest: u32,
     function: AVV_Function,
+
+    pub fn close(self: AVV_Snapshot) void {
+        self.function.close();
+    }
 };
 
-pub const AVV_Function = union {
+const functions = enum { create, delete, move };
+
+pub const AVV_Function = union(functions) {
     create: AVV_Create,
     delete: AVV_Delete,
     move: AVV_Move,
+
+    pub fn close(self: AVV_Function) void {
+        switch (self) {
+            .create => |c| {
+                for (c.points.items) |p| {
+                    p.points.deinit();
+                }
+                c.points.deinit();
+            },
+            else => {},
+        }
+    }
 };
 
-pub const AVV_Create = struct { points: []AVV_WorldPostion };
+pub const AVV_Create = struct { points: std.ArrayListAligned(AVV_Line, null) };
 
 pub const AVV_Delete = struct { ids: []u32 };
 
 pub const AVV_Move = struct {
     effects_x: bool,
     effects_y: bool,
-    positions: []bezier.Points,
+    positions: []bezier.Point,
     ids: []u32,
 };
+
+pub const AVV_Line = struct { startRounded: bool, endRounded: bool, points: std.ArrayListAligned(AVV_WorldPostion, null) };
 
 pub const AVV_WorldPostion = struct { x: f64, y: f64 };
 
@@ -85,9 +119,115 @@ pub const AVV_File = struct {
         };
     }
 
-    pub fn get(time: u64, prev: ?AVV_Snapshot) !AVV_Snapshot {
-        _ = time;
-        _ = prev;
+    pub fn get(self: AVV_File, time: u64, prev: ?AVV_Packet) !AVV_Packet {
+        var current = prev;
+        if (prev == null or prev.?.startNanosecondOffest > time or prev.?.endNanosecondOffest <= time) {
+            var index: u64 = undefined;
+            bk: {
+                if (self.packets != null) {
+                    for (0..self.packets.?.len) |i| {
+                        if (self.packets.?[i].nanosecondOffest > time) {
+                            index = i;
+                            break :bk;
+                        }
+                    }
+                    index = self.packets.?.len;
+                } else {
+                    index = 0;
+                }
+            }
+
+            if (prev) |p| p.close();
+
+            try self.file.seekTo(self.packetsOffset + (if (index == 0) 0 else self.packets.?[index - 1].byteOffest));
+
+            var d = try std.compress.lzma.decompress(
+                main.allocator,
+                self.file.reader(),
+            );
+            defer d.deinit();
+
+            var decompressed = d.reader();
+
+            var packets = std.ArrayList(AVV_Snapshot).init(main.allocator);
+
+            var have_read: u64 = 0;
+            while (have_read < d.state.unpacked_size.?) {
+                const function = try read(u8, decompressed);
+                const timeOffset = try read(u32, decompressed);
+                const args = try read(u16, decompressed);
+
+                var buf = try main.allocator.alloc(u8, args);
+                defer main.allocator.free(buf);
+                _ = try decompressed.read(buf);
+
+                have_read += 7 + args;
+
+                var i: u16 = 0;
+
+                const funcUnion: AVV_Function = bk: switch (function) {
+                    0 => {
+                        var points = try std.ArrayList(AVV_Line).initCapacity(main.allocator, 0);
+                        var positions = try std.ArrayList(AVV_WorldPostion).initCapacity(main.allocator, 0);
+
+                        var connected_end: bool = undefined;
+                        var startRounded: bool = byteSwap(u16, buf[0..2]) == 0xFFF0;
+                        if (startRounded) i += 2;
+
+                        while (i < args) {
+                            const firstTwo = byteSwap(u16, @ptrCast(buf[i .. i + 2].ptr));
+                            if (firstTwo == 0xFFF0 or firstTwo == 0x7FF0) {
+                                connected_end = firstTwo == 0xFFF0;
+
+                                var new = try points.addOne();
+                                new = @constCast(&AVV_Line{ .startRounded = startRounded, .endRounded = connected_end, .points = positions });
+
+                                positions = std.ArrayList(AVV_WorldPostion).init(main.allocator);
+
+                                startRounded = connected_end;
+                                i += 2;
+                            } else {
+                                const first = byteSwap(f64, @ptrCast(buf[i .. i + 8].ptr));
+                                i += 8;
+                                const second = byteSwap(f64, @ptrCast(buf[i .. i + 8].ptr));
+                                i += 8;
+
+                                var new = try positions.addOne();
+                                new = @constCast(&AVV_WorldPostion{
+                                    .x = first,
+                                    .y = second,
+                                });
+                            }
+                        }
+
+                        if (positions.items.len > 0) {
+                            var new = try points.addOne();
+                            new = @constCast(&AVV_Line{ .startRounded = startRounded, .endRounded = false, .points = positions });
+                        } else {
+                            positions.deinit();
+                        }
+
+                        break :bk AVV_Function{ .create = .{ .points = points } };
+                    },
+                    else => unreachable,
+                };
+
+                var new = packets.addOne();
+                new = @constCast(&AVV_Snapshot{
+                    .nanosecondOffest = timeOffset,
+                    .function = funcUnion,
+                });
+            }
+
+            current = AVV_Packet{
+                .index = index,
+                .startNanosecondOffest = if (index == 0) 0 else self.packets.?[index - 1].nanosecondOffest,
+                .endNanosecondOffest = if (index == 0 or index == self.packets.?.len) self.videoLength else self.packets.?[index].nanosecondOffest,
+                .snapshots = packets,
+            };
+        }
+
+        return error.Todo;
     }
 
     pub fn close(self: AVV_File) void {
@@ -96,20 +236,17 @@ pub const AVV_File = struct {
     }
 };
 
-fn read(comptime T: type, file: std.fs.File) !T {
+fn read(comptime T: type, file: anytype) !T {
     var buf: [@sizeOf(T)]u8 = undefined;
     _ = try file.read(&buf);
 
+    return @bitCast(byteSwap(T, &buf));
+}
+
+fn byteSwap(comptime T: type, buf: *[@sizeOf(T)]u8) T {
     if (@import("builtin").cpu.arch.endian() == .big) {
-        return @bitCast(buf);
+        return @bitCast(buf.*);
     } else {
-        if (T == f32) {
-            return @bitCast(@byteSwap(@as(u32, @bitCast(buf))));
-        } else if (T == f64) {
-            return @bitCast(@byteSwap(@as(u64, @bitCast(buf))));
-        } else if (T == f128) {
-            return @bitCast(@byteSwap(@as(u128, @bitCast(buf))));
-        }
-        return @byteSwap(@as(T, @bitCast(buf)));
+        return @bitCast(@byteSwap(@as(std.meta.Int(.unsigned, @sizeOf(T) * 8), @bitCast(buf.*))));
     }
 }
