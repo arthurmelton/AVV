@@ -16,7 +16,7 @@ pub const AVV_Packet = struct {
     index: u64,
     startNanosecondOffest: u64,
     endNanosecondOffest: u64,
-    snapshots: std.ArrayListAligned(AVV_Snapshot, null),
+    snapshots: std.ArrayListAligned(AVV_Action, null),
 
     pub fn close(self: AVV_Packet) void {
         for (self.snapshots.items) |i| {
@@ -26,11 +26,11 @@ pub const AVV_Packet = struct {
     }
 };
 
-pub const AVV_Snapshot = struct {
+pub const AVV_Action = struct {
     nanosecondOffest: u32,
     function: functions.AVV_Function,
 
-    pub fn close(self: AVV_Snapshot) void {
+    pub fn close(self: AVV_Action) void {
         self.function.close();
     }
 };
@@ -38,6 +38,12 @@ pub const AVV_Snapshot = struct {
 pub const AVV_Line = struct { startRounded: bool, endRounded: bool, points: std.ArrayListAligned(AVV_WorldPostion, null) };
 
 pub const AVV_WorldPostion = struct { x: f64, y: f64 };
+
+pub const IdOffsetXYUnion = struct {
+    id: u32,
+    offset_x: f64,
+    offset_y: f64,
+};
 
 pub const AVV_File = struct {
     file: std.fs.File,
@@ -119,7 +125,7 @@ pub const AVV_File = struct {
 
             var decompressed = d.reader();
 
-            var packets = std.ArrayList(AVV_Snapshot).init(main.allocator);
+            var packets = std.ArrayList(AVV_Action).init(main.allocator);
 
             var header: [7]u8 = undefined;
             while (decompressed.read(&header) catch 0 == 7) {
@@ -131,19 +137,18 @@ pub const AVV_File = struct {
                 defer main.allocator.free(buf);
                 _ = try decompressed.read(buf);
 
-                const funcUnion: functions.AVV_Function = switch (function) {
-                    0 => try functions.create.parse(buf),
-                    else => unreachable,
+                const funcUnion: functions.AVV_Function = switch (@as(functions.functions, @enumFromInt(function))) {
+                    .create => try functions.create.parse(buf),
+                    .delete => try functions.delete.parse(buf),
+                    .move => try functions.move.parse(buf),
+                    .scale => try functions.scale.parse(timeOffset, packets.items, buf),
+                    _ => unreachable,
                 };
 
-                (try packets.addOne()).* = AVV_Snapshot{
+                (try packets.addOne()).* = AVV_Action{
                     .nanosecondOffest = timeOffset,
                     .function = funcUnion,
                 };
-
-                for (packets.items) |i| {
-                    std.debug.print("{any}\n", .{i});
-                }
             }
 
             current = AVV_Packet{
@@ -162,6 +167,49 @@ pub const AVV_File = struct {
         main.allocator.free(self.packets);
     }
 };
+
+pub fn getPos(time: u32, items: []AVV_Action, id: u32) !AVV_WorldPostion {
+    var ids: u32 = 0;
+    var pos: ?AVV_WorldPostion = null;
+    for (items) |i| {
+        switch (i.function) {
+            .create => |c| {
+                if (ids == id) {
+                    pos = c.lines.items[0].points.items[0];
+                }
+                ids += 1;
+            },
+            .delete => |d| if (std.mem.containsAtLeast(u32, d.ids, 1, &[1]u32{id})) return error.itemDoesNotExist,
+            .move => |m| if (std.mem.containsAtLeast(u32, m.ids, 1, &[1]u32{id})) {
+                const offset = bezier.get(time - i.nanosecondOffest, m.positions);
+
+                pos.?.x += if (m.effects_x) offset else 0;
+                pos.?.y += if (m.effects_y) offset else 0;
+            },
+            .scale => |s| {
+                var start: ?IdOffsetXYUnion = null;
+                for (s.ids) |_id| {
+                    if (_id.id == id) {
+                        start = _id;
+                        break;
+                    }
+                }
+
+                if (start) |_start| {
+                    const offset = bezier.get(time - i.nanosecondOffest, s.positions);
+
+                    pos.?.x += offset * _start.offset_x;
+                    pos.?.y += offset * _start.offset_y;
+                }
+            },
+        }
+    }
+
+    if (pos) |p| {
+        return p;
+    }
+    return error.NotFound;
+}
 
 pub fn read(comptime T: type, file: anytype) !T {
     var buf: [@sizeOf(T)]u8 = undefined;

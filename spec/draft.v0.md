@@ -45,6 +45,8 @@ It will run as follows:
 
 At 6ns the color would be `0.165` (`(0.2-(0.11/11*5 + (0.6-(0.11/11*3)/6)*2)) + (0.1-(0.11/11*5 + (0.6-(0.11/11*3)/6)*2))) + (0.11/11*6) + ((0.6-(0.11/11*3)/6)*3)`)
 
+Everything acts like this besides move functions, those work based on offset.
+
 ## Functions
 
 - 0 - [create](#create)
@@ -79,8 +81,8 @@ The arguments are an array of [ids](#id-4-bytes) that are deleted. Referencing t
 |Offset|Length|Description|
 |-|-|-|
 |0x00|2 bytes|First bit is a flag for whether it affects `x`; second is for `y`. 2 bits reserved. The next 12 bits are the number of [Bézier positions](#bézier-position-12-bytes) minus one.|
-|0x02|`(bézier_positions-1)*12+8` bytes (varies)|The first position has an implicit `0` for the `x`. Then it's an array of [Bézier position](#bézier-position-12-bytes).|
-|`0x0A+(bézier_positions-1)*0x0C`|`operation_bytes-current_offset` bytes (varies)|This is a list of [ids](#id-4-bytes) that this operation affects.|
+|0x02|`(bézier_positions)*12+8` bytes (varies)|The first position has an implicit `0` for the `x`. Then it's an array of [Bézier position](#bézier-position-12-bytes).|
+|`0x0A+(bézier_positions)*0x0C`|`operation_bytes-current_offset` bytes (varies)|This is a list of [ids](#id-4-bytes) that this operation affects.|
 
 If both `x` and `y` is set, then both get effected by this.
 

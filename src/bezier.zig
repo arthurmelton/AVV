@@ -34,7 +34,7 @@ pub fn get(a: u32, points: []Point) f64 {
 
         current *= count;
 
-        val += (current * points[i].y) / upper;
+        val += (@as(f64, @floatFromInt(current)) * points[i].y) / @as(f64, @floatFromInt(upper));
     }
 
     return val;

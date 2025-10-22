@@ -19,7 +19,7 @@ printf '0000000100000000' | xxd -r -p >> ball.v0.avv
 packet="00"
 # start instantly
 packet+="00000000"
-# number of bytes minus one (4 curves each with 4 points)
+# number of bytes (4 curves each with 4 points)
 packet+="00D6"
 
 # drawing lines from https://spencermortensen.com/articles/bezier-circle/ for circle
@@ -58,17 +58,19 @@ packet+="04"
 # start instantly
 packet+="00000000"
 # number of bytes
-packet+="000A"
+packet+="000E"
 # blue and alpha and 1 point set to 1
 packet+="5000"
 packet+="3FF0000000000000"
+# only effect our first line
+packet+="00000000"
 
 # have ball fall
 packet+="02"
 # start instantly
 packet+="00000000"
 # number of bytes
-packet+="0024"
+packet+="0026"
 
 # effects only x and 3 points
 packet+="8002"
@@ -81,17 +83,17 @@ packet+="0000000000000000"
 packet+="80000000"
 packet+="BFF0000000000000"
 # only effect our first line
-packet+="00000001"
+packet+="00000000"
 
 # have ball bounce back
 packet+="02"
 # start after ball is at the lowest
 packet+="80000000"
 # number of bytes
-packet+="0024"
+packet+="0026"
 
 # effects only x and 3 points
-packet+="8003"
+packet+="8002"
 # (0,0)
 packet+="0000000000000000"
 # (2^31, 0)
@@ -101,6 +103,6 @@ packet+="0000000000000000"
 packet+="80000000"
 packet+="3FF0000000000000"
 # only effect our first line
-packet+="00000001"
+packet+="00000000"
 
 printf "%s" "$packet" | xxd -r -p | lzma -9 >> ball.v0.avv
