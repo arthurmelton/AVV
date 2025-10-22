@@ -7,11 +7,38 @@ const _parse = @import("../parse.zig");
 pub const AVV_Scale = struct {
     from: _parse.AVV_WorldPostion,
     positions: []bezier.Point,
-    ids: []_parse.IdOffsetXYUnion,
+    ids: []_parse.IdOffsetXYArray,
 
     pub fn close(self: AVV_Scale) void {
         main.allocator.free(self.positions);
+        for (self.ids) |i| {
+            main.allocator.free(i.offset);
+        }
         main.allocator.free(self.ids);
+    }
+
+    pub fn update(self: AVV_Scale, time: u32, objects: []_parse.AVV_Object) void {
+        for (objects) |o| {
+            var start: ?_parse.IdOffsetXYArray = null;
+            for (self.ids) |_id| {
+                if (_id.id == o.id) {
+                    start = _id;
+                    break;
+                }
+            }
+            if (start) |_start| {
+                const offset = bezier.get(time - o.nanosecondOffset, self.positions);
+
+                var current: u16 = 0;
+                for (o.lines.items) |l| {
+                    for (l.points.items) |*p| {
+                        p.x += offset * _start.offset[current].x;
+                        p.y += offset * _start.offset[current].y;
+                        current += 1;
+                    }
+                }
+            }
+        }
     }
 };
 
@@ -39,13 +66,31 @@ pub fn parse(time: u32, allPrev: []_parse.AVV_Action, buf: []u8) !functions.AVV_
         };
     }
 
-    var ids = try main.allocator.alloc(_parse.IdOffsetXYUnion, numOfIds);
+    var ids = try main.allocator.alloc(_parse.IdOffsetXYArray, numOfIds);
 
     for (0..numOfIds) |i| {
         const id = _parse.byteSwap(u32, @ptrCast(buf[18 + (numOfPoints * 12 + 8) + (i * 4) .. 22 + (numOfPoints * 12 + 8) + (i * 4)].ptr));
-        const pos = try _parse.getPos(time, allPrev, id);
+        const obj = try _parse.getObject(time, allPrev, id);
 
-        ids[i] = _parse.IdOffsetXYUnion{ .id = id, .offset_x = pos.x, .offset_y = pos.y };
+        var count: usize = 0;
+        for (obj.lines.items) |l| {
+            count += l.points.items.len;
+        }
+
+        var pos = try main.allocator.alloc(_parse.AVV_WorldPostion, count);
+
+        count = 0;
+        for (obj.lines.items) |l| {
+            for (l.points.items) |*p| {
+                pos[count] = _parse.AVV_WorldPostion{
+                    .x = p.x - from.x,
+                    .y = p.y - from.y,
+                };
+                count += 1;
+            }
+        }
+
+        ids[i] = _parse.IdOffsetXYArray{ .id = id, .offset = pos };
     }
 
     return functions.AVV_Function{ .scale = .{

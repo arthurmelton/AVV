@@ -14,6 +14,21 @@ pub const AVV_Move = struct {
         main.allocator.free(self.positions);
         main.allocator.free(self.ids);
     }
+
+    pub fn update(self: AVV_Move, time: u32, objects: []_parse.AVV_Object) void {
+        for (objects) |o| {
+            if (std.mem.containsAtLeast(u32, self.ids, 1, &[1]u32{o.id})) {
+                const offset = bezier.get(time - o.nanosecondOffset, self.positions);
+
+                for (o.lines.items) |l| {
+                    for (l.points.items) |*p| {
+                        p.x += if (self.effects_x) offset else 0;
+                        p.y += if (self.effects_y) offset else 0;
+                    }
+                }
+            }
+        }
+    }
 };
 
 pub fn parse(buf: []u8) !functions.AVV_Function {

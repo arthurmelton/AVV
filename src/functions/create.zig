@@ -4,17 +4,14 @@ const functions = @import("mod.zig");
 const main = @import("../main.zig");
 
 pub const AVV_Create = struct {
-    lines: std.ArrayListAligned(_parse.AVV_Line, null),
+    object: _parse.AVV_Object,
 
     pub fn close(self: AVV_Create) void {
-        for (self.lines.items) |p| {
-            p.points.deinit();
-        }
-        self.lines.deinit();
+        self.object.close();
     }
 };
 
-pub fn parse(buf: []u8) !functions.AVV_Function {
+pub fn parse(id: u32, nanosecondOffset: u32, buf: []u8) !functions.AVV_Function {
     var i: u16 = 0;
     var lines = try std.ArrayList(_parse.AVV_Line).initCapacity(main.allocator, 0);
     var positions = try std.ArrayList(_parse.AVV_WorldPostion).initCapacity(main.allocator, 0);
@@ -63,5 +60,5 @@ pub fn parse(buf: []u8) !functions.AVV_Function {
         positions.deinit();
     }
 
-    return functions.AVV_Function{ .create = .{ .lines = lines } };
+    return functions.AVV_Function{ .create = .{ .object = _parse.AVV_Object{ .id = id, .lines = lines, .nanosecondOffset = nanosecondOffset, .fillColor = _parse.AVV_Color{ .r = 0, .g = 0, .b = 0, .a = 0 } } } };
 }

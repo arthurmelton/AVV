@@ -8,14 +8,14 @@ const AVVFileOpenError = error{
 };
 
 pub const AVV_Packets = struct {
-    nanosecondOffest: u64,
-    byteOffest: u64,
+    nanosecondOffset: u64,
+    byteOffset: u64,
 };
 
 pub const AVV_Packet = struct {
     index: u64,
-    startNanosecondOffest: u64,
-    endNanosecondOffest: u64,
+    startNanosecondOffset: u64,
+    endNanosecondOffset: u64,
     snapshots: std.ArrayListAligned(AVV_Action, null),
 
     pub fn close(self: AVV_Packet) void {
@@ -27,7 +27,7 @@ pub const AVV_Packet = struct {
 };
 
 pub const AVV_Action = struct {
-    nanosecondOffest: u32,
+    nanosecondOffset: u32,
     function: functions.AVV_Function,
 
     pub fn close(self: AVV_Action) void {
@@ -35,14 +35,57 @@ pub const AVV_Action = struct {
     }
 };
 
-pub const AVV_Line = struct { startRounded: bool, endRounded: bool, points: std.ArrayListAligned(AVV_WorldPostion, null) };
+pub const AVV_Object = struct {
+    id: u32,
+    nanosecondOffset: u32,
+    lines: std.ArrayListAligned(AVV_Line, null),
+    fillColor: AVV_Color,
+
+    pub fn close(self: AVV_Object) void {
+        for (self.lines.items) |i| {
+            i.close();
+        }
+        self.lines.deinit();
+    }
+
+    pub fn clone(self: AVV_Object) !AVV_Object {
+        var lines = try std.ArrayList(AVV_Line).initCapacity(main.allocator, self.lines.items.len);
+        for (0..self.lines.items.len) |i| {
+            var positions = try std.ArrayList(AVV_WorldPostion).initCapacity(main.allocator, self.lines.items[i].points.items.len);
+            for (0..self.lines.items[i].points.items.len) |x| {
+                positions.items[x] = self.lines.items[i].points.items[x];
+            }
+            lines.items[i] = AVV_Line{
+                .startRounded = self.lines.items[i].startRounded,
+                .endRounded = self.lines.items[i].endRounded,
+                .points = positions,
+            };
+        }
+
+        return AVV_Object{ .id = self.id, .nanosecondOffset = self.nanosecondOffset, .lines = lines, .fillColor = self.fillColor };
+    }
+};
+
+pub const AVV_Line = struct {
+    startRounded: bool,
+    endRounded: bool,
+    points: std.ArrayListAligned(AVV_WorldPostion, null),
+
+    pub fn close(self: AVV_Line) void {
+        self.points.deinit();
+    }
+};
 
 pub const AVV_WorldPostion = struct { x: f64, y: f64 };
+pub const AVV_Color = struct { r: f32, g: f32, b: f32, a: f32 };
 
-pub const IdOffsetXYUnion = struct {
+pub const IdOffsetXYArray = struct {
     id: u32,
-    offset_x: f64,
-    offset_y: f64,
+    offset: []AVV_WorldPostion,
+
+    pub fn close(self: IdOffsetXYArray) void {
+        main.allocator.free(self.offset);
+    }
 };
 
 pub const AVV_File = struct {
@@ -74,8 +117,8 @@ pub const AVV_File = struct {
         if (numOfPackets > 0) {
             packets = try main.allocator.alloc(AVV_Packets, numOfPackets);
             for (0..numOfPackets) |i| {
-                packets.?[i].nanosecondOffest = try read(u64, file);
-                packets.?[i].byteOffest = try read(u64, file);
+                packets.?[i].nanosecondOffset = try read(u64, file);
+                packets.?[i].byteOffset = try read(u64, file);
             }
         }
 
@@ -97,12 +140,12 @@ pub const AVV_File = struct {
 
     pub fn get(self: AVV_File, time: u64, prev: ?AVV_Packet) !AVV_Packet {
         var current = prev;
-        if (prev == null or prev.?.startNanosecondOffest > time or prev.?.endNanosecondOffest <= time) {
+        if (prev == null or prev.?.startNanosecondOffset > time or prev.?.endNanosecondOffset <= time) {
             var index: u64 = undefined;
             bk: {
                 if (self.packets != null) {
                     for (0..self.packets.?.len) |i| {
-                        if (self.packets.?[i].nanosecondOffest > time) {
+                        if (self.packets.?[i].nanosecondOffset > time) {
                             index = i;
                             break :bk;
                         }
@@ -115,7 +158,7 @@ pub const AVV_File = struct {
 
             if (prev) |p| p.close();
 
-            try self.file.seekTo(self.packetsOffset + (if (index == 0) 0 else self.packets.?[index - 1].byteOffest));
+            try self.file.seekTo(self.packetsOffset + (if (index == 0) 0 else self.packets.?[index - 1].byteOffset));
 
             var d = try std.compress.lzma.decompress(
                 main.allocator,
@@ -128,6 +171,8 @@ pub const AVV_File = struct {
             var packets = std.ArrayList(AVV_Action).init(main.allocator);
 
             var header: [7]u8 = undefined;
+
+            var ids: u32 = 0;
             while (decompressed.read(&header) catch 0 == 7) {
                 const function = header[0];
                 const timeOffset = byteSwap(u32, header[1..5]);
@@ -138,23 +183,27 @@ pub const AVV_File = struct {
                 _ = try decompressed.read(buf);
 
                 const funcUnion: functions.AVV_Function = switch (@as(functions.functions, @enumFromInt(function))) {
-                    .create => try functions.create.parse(buf),
+                    .create => try functions.create.parse(ids, timeOffset, buf),
                     .delete => try functions.delete.parse(buf),
                     .move => try functions.move.parse(buf),
                     .scale => try functions.scale.parse(timeOffset, packets.items, buf),
-                    _ => unreachable,
+                    _ => @panic("Unkown function used"),
                 };
 
+                if (@as(functions.functions, @enumFromInt(function)) == .create) {
+                    ids += 1;
+                }
+
                 (try packets.addOne()).* = AVV_Action{
-                    .nanosecondOffest = timeOffset,
+                    .nanosecondOffset = timeOffset,
                     .function = funcUnion,
                 };
             }
 
             current = AVV_Packet{
                 .index = index,
-                .startNanosecondOffest = if (index == 0) 0 else self.packets.?[index - 1].nanosecondOffest,
-                .endNanosecondOffest = if (index == 0 or index == self.packets.?.len) self.videoLength else self.packets.?[index].nanosecondOffest,
+                .startNanosecondOffset = if (index == 0) 0 else self.packets.?[index - 1].nanosecondOffset,
+                .endNanosecondOffset = if (index == 0 or index == self.packets.?.len) self.videoLength else self.packets.?[index].nanosecondOffset,
                 .snapshots = packets,
             };
         }
@@ -168,45 +217,25 @@ pub const AVV_File = struct {
     }
 };
 
-pub fn getPos(time: u32, items: []AVV_Action, id: u32) !AVV_WorldPostion {
-    var ids: u32 = 0;
-    var pos: ?AVV_WorldPostion = null;
+pub fn getObject(time: u32, items: []AVV_Action, id: u32) !AVV_Object {
+    var obj: ?AVV_Object = null;
+    errdefer if (obj) |p| p.close();
+
     for (items) |i| {
         switch (i.function) {
             .create => |c| {
-                if (ids == id) {
-                    pos = c.lines.items[0].points.items[0];
+                if (c.object.id == id) {
+                    obj = try c.object.clone();
                 }
-                ids += 1;
             },
             .delete => |d| if (std.mem.containsAtLeast(u32, d.ids, 1, &[1]u32{id})) return error.itemDoesNotExist,
-            .move => |m| if (std.mem.containsAtLeast(u32, m.ids, 1, &[1]u32{id})) {
-                const offset = bezier.get(time - i.nanosecondOffest, m.positions);
-
-                pos.?.x += if (m.effects_x) offset else 0;
-                pos.?.y += if (m.effects_y) offset else 0;
-            },
-            .scale => |s| {
-                var start: ?IdOffsetXYUnion = null;
-                for (s.ids) |_id| {
-                    if (_id.id == id) {
-                        start = _id;
-                        break;
-                    }
-                }
-
-                if (start) |_start| {
-                    const offset = bezier.get(time - i.nanosecondOffest, s.positions);
-
-                    pos.?.x += offset * _start.offset_x;
-                    pos.?.y += offset * _start.offset_y;
-                }
-            },
+            .move => |m| m.update(time, @constCast(&[1]AVV_Object{obj.?})),
+            .scale => |s| s.update(time, @constCast(&[1]AVV_Object{obj.?})),
         }
     }
 
-    if (pos) |p| {
-        return p;
+    if (obj) |o| {
+        return o;
     }
     return error.NotFound;
 }
