@@ -79,9 +79,9 @@ packet+="0000000000000000"
 # (2^31, 0)
 packet+="80000000"
 packet+="0000000000000000"
-# (2^31, -1)
+# (2^31, 1)
 packet+="80000000"
-packet+="BFF0000000000000"
+packet+="3FF0000000000000"
 # only effect our first line
 packet+="00000000"
 
@@ -98,10 +98,10 @@ packet+="4002"
 packet+="0000000000000000"
 # (2^31, 0)
 packet+="80000000"
-packet+="0000000000000000"
-# (2^31, 1)
+packet+="BFF0000000000000"
+# (2^31, -1)
 packet+="80000000"
-packet+="3FF0000000000000"
+packet+="BFF0000000000000"
 # only effect our first line
 packet+="00000000"
 

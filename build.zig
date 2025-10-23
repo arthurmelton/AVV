@@ -1,8 +1,11 @@
 const std = @import("std");
+const sdl = @import("sdl");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
+    const sdk = sdl.init(b, .{});
 
     const exe = b.addExecutable(.{
         .name = "AVV",
@@ -14,6 +17,9 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+
+    sdk.link(exe, .dynamic, sdl.Library.SDL2);
+    exe.root_module.addImport("sdl2", sdk.getNativeModule());
 
     b.installArtifact(exe);
 

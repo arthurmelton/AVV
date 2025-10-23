@@ -18,7 +18,7 @@ pub const AVV_Move = struct {
     pub fn update(self: AVV_Move, time: u32, objects: []*_parse.AVV_Object) void {
         for (objects) |o| {
             if (std.mem.containsAtLeast(u32, self.ids, 1, &[1]u32{o.id})) {
-                const offset = bezier.get(time - o.nanosecondOffset, self.positions);
+                const offset = bezier.get(time, self.positions);
 
                 for (o.lines.items) |*l| {
                     for (l.points.items) |*p| {

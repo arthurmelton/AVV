@@ -14,26 +14,26 @@ pub const AVV_Create = struct {
 pub fn parse(id: u32, nanosecondOffset: u32, buf: []u8) !functions.AVV_Function {
     var i: u16 = 0;
     var lines = std.ArrayList(_parse.AVV_Line).init(main.allocator);
-    var positions = std.ArrayList(_parse.AVV_WorldPostion).init(main.allocator);
+    var positions = std.ArrayList(_parse.AVV_WorldPosition).init(main.allocator);
 
     var connected_end: bool = undefined;
     var startRounded: bool = _parse.byteSwap(u16, buf[0..2]) == 0xFFF0;
     if (startRounded) i += 2;
 
+    var first: ?f64 = null;
+    var second: f64 = undefined;
+
     while (i < buf.len) {
         const firstTwo = _parse.byteSwap(u16, @ptrCast(buf[i .. i + 2].ptr));
-
-        var first: ?f64 = null;
-        var second: f64 = undefined;
 
         if (firstTwo == 0xFFF0 or firstTwo == 0x7FF0) {
             connected_end = firstTwo == 0xFFF0;
 
             try lines.append(_parse.AVV_Line{ .startRounded = startRounded, .endRounded = connected_end, .points = positions });
 
-            positions = std.ArrayList(_parse.AVV_WorldPostion).init(main.allocator);
+            positions = std.ArrayList(_parse.AVV_WorldPosition).init(main.allocator);
             if (first) |f| {
-                try positions.append(_parse.AVV_WorldPostion{
+                try positions.append(_parse.AVV_WorldPosition{
                     .x = f,
                     .y = second,
                 });
@@ -47,7 +47,7 @@ pub fn parse(id: u32, nanosecondOffset: u32, buf: []u8) !functions.AVV_Function 
             second = _parse.byteSwap(f64, @ptrCast(buf[i .. i + 8].ptr));
             i += 8;
 
-            try positions.append(_parse.AVV_WorldPostion{
+            try positions.append(_parse.AVV_WorldPosition{
                 .x = first.?,
                 .y = second,
             });

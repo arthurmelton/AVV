@@ -51,7 +51,7 @@ pub const AVV_Object = struct {
     pub fn clone(self: AVV_Object) !AVV_Object {
         var lines = try std.ArrayList(AVV_Line).initCapacity(main.allocator, self.lines.items.len);
         for (0..self.lines.items.len) |i| {
-            var positions = try std.ArrayList(AVV_WorldPostion).initCapacity(main.allocator, self.lines.items[i].points.items.len);
+            var positions = try std.ArrayList(AVV_WorldPosition).initCapacity(main.allocator, self.lines.items[i].points.items.len);
             for (0..self.lines.items[i].points.items.len) |x| {
                 try positions.append(self.lines.items[i].points.items[x]);
             }
@@ -69,19 +69,19 @@ pub const AVV_Object = struct {
 pub const AVV_Line = struct {
     startRounded: bool,
     endRounded: bool,
-    points: std.ArrayListAligned(AVV_WorldPostion, null),
+    points: std.ArrayListAligned(AVV_WorldPosition, null),
 
     pub fn close(self: AVV_Line) void {
         self.points.deinit();
     }
 };
 
-pub const AVV_WorldPostion = struct { x: f64, y: f64 };
+pub const AVV_WorldPosition = struct { x: f64, y: f64 };
 pub const AVV_Color = struct { r: f32, g: f32, b: f32, a: f32 };
 
 pub const IdOffsetXYArray = struct {
     id: u32,
-    offset: []AVV_WorldPostion,
+    offset: []AVV_WorldPosition,
 
     pub fn close(self: IdOffsetXYArray) void {
         main.allocator.free(self.offset);
@@ -249,7 +249,7 @@ pub fn getObject(time: u32, items: []AVV_Action, id: u32) !AVV_Object {
     errdefer if (obj) |p| p.close();
 
     for (items) |i| {
-        if (i.nanosecondOffset >= time) break;
+        if (i.nanosecondOffset > time) break;
         switch (i.function) {
             .create => |c| {
                 if (c.object.id == id) {
@@ -257,8 +257,8 @@ pub fn getObject(time: u32, items: []AVV_Action, id: u32) !AVV_Object {
                 }
             },
             .delete => |d| if (std.mem.containsAtLeast(u32, d.ids, 1, &[1]u32{id})) return error.itemDoesNotExist,
-            .move => |m| m.update(time, @constCast(&[_]*AVV_Object{&obj.?})),
-            .scale => |s| s.update(time, @constCast(&[_]*AVV_Object{&obj.?})),
+            .move => |m| m.update(time - i.nanosecondOffset, @constCast(&[_]*AVV_Object{&obj.?})),
+            .scale => |s| s.update(time - i.nanosecondOffset, @constCast(&[_]*AVV_Object{&obj.?})),
         }
     }
 

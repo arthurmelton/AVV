@@ -4,6 +4,10 @@
     .fingerprint = 0xe0f030f6bc580c3f, // Changing this has security and trust implications.
     .minimum_zig_version = "0.14.1",
     .dependencies = .{
+        .sdl = .{
+            .url = "git+https://github.com/ikskuh/SDL.zig#424ff5f9245ef352e4c508c77ddaeed2f46bd605",
+            .hash = "SDL2-0.0.0-yMCQigakBADGJHtb2ljt13P_cCnG8Y819HRnIibNVPFk",
+        },
     },
     .paths = .{
         "build.zig",

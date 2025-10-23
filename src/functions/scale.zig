@@ -5,7 +5,7 @@ const main = @import("../main.zig");
 const _parse = @import("../parse.zig");
 
 pub const AVV_Scale = struct {
-    from: _parse.AVV_WorldPostion,
+    from: _parse.AVV_WorldPosition,
     positions: []bezier.Point,
     ids: []_parse.IdOffsetXYArray,
 
@@ -44,7 +44,7 @@ pub const AVV_Scale = struct {
 
 pub fn parse(time: u32, allPrev: []_parse.AVV_Action, buf: []u8) !functions.AVV_Function {
     const header = _parse.byteSwap(u16, @ptrCast(buf[0..2].ptr));
-    const from = _parse.AVV_WorldPostion{
+    const from = _parse.AVV_WorldPosition{
         .x = _parse.byteSwap(f64, @ptrCast(buf[2..10].ptr)),
         .y = _parse.byteSwap(f64, @ptrCast(buf[10..18].ptr)),
     };
@@ -78,12 +78,12 @@ pub fn parse(time: u32, allPrev: []_parse.AVV_Action, buf: []u8) !functions.AVV_
             count += l.points.items.len;
         }
 
-        var pos = try main.allocator.alloc(_parse.AVV_WorldPostion, count);
+        var pos = try main.allocator.alloc(_parse.AVV_WorldPosition, count);
 
         count = 0;
         for (obj.lines.items) |l| {
             for (l.points.items) |*p| {
-                pos[count] = _parse.AVV_WorldPostion{
+                pos[count] = _parse.AVV_WorldPosition{
                     .x = p.x - from.x,
                     .y = p.y - from.y,
                 };
