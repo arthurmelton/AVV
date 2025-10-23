@@ -72,8 +72,8 @@ packet+="00000000"
 # number of bytes
 packet+="0026"
 
-# effects only x and 3 points
-packet+="8002"
+# effects only y and 3 points
+packet+="4002"
 # (0,0)
 packet+="0000000000000000"
 # (2^31, 0)
@@ -92,8 +92,8 @@ packet+="80000000"
 # number of bytes
 packet+="0026"
 
-# effects only x and 3 points
-packet+="8002"
+# effects only y and 3 points
+packet+="4002"
 # (0,0)
 packet+="0000000000000000"
 # (2^31, 0)

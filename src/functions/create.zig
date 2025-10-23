@@ -13,8 +13,8 @@ pub const AVV_Create = struct {
 
 pub fn parse(id: u32, nanosecondOffset: u32, buf: []u8) !functions.AVV_Function {
     var i: u16 = 0;
-    var lines = try std.ArrayList(_parse.AVV_Line).initCapacity(main.allocator, 0);
-    var positions = try std.ArrayList(_parse.AVV_WorldPostion).initCapacity(main.allocator, 0);
+    var lines = std.ArrayList(_parse.AVV_Line).init(main.allocator);
+    var positions = std.ArrayList(_parse.AVV_WorldPostion).init(main.allocator);
 
     var connected_end: bool = undefined;
     var startRounded: bool = _parse.byteSwap(u16, buf[0..2]) == 0xFFF0;
@@ -29,14 +29,14 @@ pub fn parse(id: u32, nanosecondOffset: u32, buf: []u8) !functions.AVV_Function 
         if (firstTwo == 0xFFF0 or firstTwo == 0x7FF0) {
             connected_end = firstTwo == 0xFFF0;
 
-            (try lines.addOne()).* = _parse.AVV_Line{ .startRounded = startRounded, .endRounded = connected_end, .points = positions };
+            try lines.append(_parse.AVV_Line{ .startRounded = startRounded, .endRounded = connected_end, .points = positions });
 
             positions = std.ArrayList(_parse.AVV_WorldPostion).init(main.allocator);
             if (first) |f| {
-                (try positions.addOne()).* = _parse.AVV_WorldPostion{
+                try positions.append(_parse.AVV_WorldPostion{
                     .x = f,
                     .y = second,
-                };
+                });
             }
 
             startRounded = connected_end;
@@ -47,15 +47,15 @@ pub fn parse(id: u32, nanosecondOffset: u32, buf: []u8) !functions.AVV_Function 
             second = _parse.byteSwap(f64, @ptrCast(buf[i .. i + 8].ptr));
             i += 8;
 
-            (try positions.addOne()).* = _parse.AVV_WorldPostion{
+            try positions.append(_parse.AVV_WorldPostion{
                 .x = first.?,
                 .y = second,
-            };
+            });
         }
     }
 
     if (positions.items.len > 0) {
-        (try lines.addOne()).* = _parse.AVV_Line{ .startRounded = startRounded, .endRounded = false, .points = positions };
+        try lines.append(_parse.AVV_Line{ .startRounded = startRounded, .endRounded = false, .points = positions });
     } else {
         positions.deinit();
     }
