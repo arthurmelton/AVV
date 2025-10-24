@@ -57,7 +57,7 @@ pub fn main() !void {
         const frame = try parsed.get(@intCast(current - start.?), &state);
 
         if (last) |l| {
-            std.debug.print("{any} fps\n", .{@divTrunc(1000000000,current - l)});
+            std.debug.print("{any} fps\n", .{@divTrunc(1000000000, current - l)});
         }
 
         for (frame) |o| {
@@ -74,7 +74,7 @@ pub fn main() !void {
                 while (t <= 1.0) {
                     const _current = try deCasteljau(l.points.items, l.points.items.len, t);
 
-                    points[i] = .{.x=@as(i32,@intFromFloat((_current.x + 1) / 2 * @as(f64, @floatFromInt(x)))), .y=@as(i32, @intFromFloat((_current.y + 1) / 2 * @as(f64, @floatFromInt(y))))};
+                    points[i] = .{ .x = @as(i32, @intFromFloat((_current.x + 1) / 2 * @as(f64, @floatFromInt(x)))), .y = @as(i32, @intFromFloat((_current.y + 1) / 2 * @as(f64, @floatFromInt(y)))) };
                     i += 1;
 
                     prev = _current;
@@ -82,10 +82,10 @@ pub fn main() !void {
                 }
             }
 
-            _ = SDL.SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
+            _ = SDL.SDL_SetRenderDrawColor(renderer, 0xCf, 0x4A, 0x4B, 0xFF);
             try fillPolygon(renderer, points);
 
-            _ = SDL.SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
+            _ = SDL.SDL_SetRenderDrawColor(renderer, 0x04, 0x00, 0x02, 0xFF);
             var prev: ?SDL.SDL_Point = null;
             for (points) |p| {
                 if (prev) |pp| {
@@ -93,7 +93,6 @@ pub fn main() !void {
                 }
                 prev = p;
             }
-
         }
 
         SDL.SDL_RenderPresent(renderer);
@@ -139,17 +138,17 @@ fn fillPolygon(renderer: ?*SDL.SDL_Renderer, points: []const SDL.SDL_Point) !voi
 
         var i: usize = 0;
         while (i < points.len) : (i += 1) {
-            const j = if (i == 0) points.len-1 else i-1;
+            const j = if (i == 0) points.len - 1 else i - 1;
             const p1 = points[i];
             const p2 = points[j];
 
             if (p1.y == p2.y) continue;
 
             if ((p1.y > y and p2.y <= y) or (p2.y > y and p1.y <= y)) {
-                const slope = @as(f32,@floatFromInt(p2.x - p1.x)) / @as(f32,@floatFromInt(p2.y - p1.y));
-                const x_float = @as(f32,@floatFromInt(p1.x)) + slope * @as(f32,@floatFromInt(y - p1.y));
+                const slope = @as(f32, @floatFromInt(p2.x - p1.x)) / @as(f32, @floatFromInt(p2.y - p1.y));
+                const x_float = @as(f32, @floatFromInt(p1.x)) + slope * @as(f32, @floatFromInt(y - p1.y));
 
-                const x = @as(i32,@intFromFloat(@round(x_float)));
+                const x = @as(i32, @intFromFloat(@round(x_float)));
                 try intersections.append(x);
             }
         }
@@ -159,15 +158,8 @@ fn fillPolygon(renderer: ?*SDL.SDL_Renderer, points: []const SDL.SDL_Point) !voi
         if (intersections.items.len >= 2) {
             var k: usize = 0;
             while (k + 1 < intersections.items.len) : (k += 2) {
-                _ = SDL.SDL_RenderDrawLine(
-                    renderer,
-                    intersections.items[k],
-                    y,
-                    intersections.items[k+1],
-                    y
-                );
+                _ = SDL.SDL_RenderDrawLine(renderer, intersections.items[k], y, intersections.items[k + 1], y);
             }
         }
     }
 }
-

@@ -33,8 +33,8 @@ pub const AVV_Scale = struct {
                 var current: u16 = 0;
                 for (o.lines.items) |*l| {
                     for (l.points.items) |*p| {
-                        p.x += (offset.?-1) * _start.offset[current].x;
-                        p.y += (offset.?-1) * _start.offset[current].y;
+                        p.x += (offset.? - 1) * _start.offset[current].x;
+                        p.y += (offset.? - 1) * _start.offset[current].y;
                         current += 1;
                     }
                 }
