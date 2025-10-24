@@ -18,6 +18,8 @@ pub const AVV_Scale = struct {
     }
 
     pub fn update(self: AVV_Scale, time: u32, objects: []*_parse.AVV_Object) void {
+        var offset: ?f64 = null;
+
         for (objects) |o| {
             var start: ?_parse.IdOffsetXYArray = null;
             for (self.ids) |_id| {
@@ -27,13 +29,12 @@ pub const AVV_Scale = struct {
                 }
             }
             if (start) |_start| {
-                const offset = bezier.get(time - o.nanosecondOffset, self.positions);
-
+                if (offset == null) offset = bezier.get(time, self.positions);
                 var current: u16 = 0;
                 for (o.lines.items) |*l| {
                     for (l.points.items) |*p| {
-                        p.x += offset * _start.offset[current].x;
-                        p.y += offset * _start.offset[current].y;
+                        p.x += (offset.?-1) * _start.offset[current].x;
+                        p.y += (offset.?-1) * _start.offset[current].y;
                         current += 1;
                     }
                 }

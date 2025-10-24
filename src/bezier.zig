@@ -15,10 +15,10 @@ pub fn get(a: u32, points: []Point) f64 {
     var count: u32 = 1;
     var val: f64 = 0;
 
-    for (1..num_of_points) |i| {
+    for (0..num_of_points) |i| {
         if (i == 1 or i == num_of_points - 2) {
             count = num_of_points - 1;
-        } else if (i == num_of_points - 1) {
+        } else if (i == 0 or i == num_of_points - 1) {
             count = 1;
         } else {
             count *= @as(u32, @truncate(@divExact(num_of_points + 1 - i, i)));

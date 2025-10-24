@@ -7,7 +7,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 pub const allocator = gpa.allocator();
 
 pub fn main() !void {
-    const parsed = try parse.AVV_File.open(@constCast("./samples/ball.v0.avv"));
+    const parsed = try parse.AVV_File.open(@constCast("./samples/love.v0.avv"));
 
     var x: i32 = 500;
     var y: i32 = 500;
